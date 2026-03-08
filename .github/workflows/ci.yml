@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: docbiner_test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: docbiner_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - run: go test ./... -v
+        env:
+          DATABASE_URL: postgresql://docbiner_test:test@localhost:5432/docbiner_test?sslmode=disable
+
+  lint-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  test-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd services/dashboard && npm ci && npm run lint && npm run build
+
+  test-sdks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Node SDK
+        run: cd sdks/node && npm ci && npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test Python SDK
+        run: cd sdks/python && pip install -e ".[dev]" && pytest
+
+  build-images:
+    needs: [test-go, lint-go, test-dashboard]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/api:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/api:latest
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/worker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/worker:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/worker:latest
+
+      - name: Build and push Dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/dashboard/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/dashboard:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/dashboard:latest

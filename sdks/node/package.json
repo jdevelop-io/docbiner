@@ -1,0 +1,17 @@
+{
+  "name": "@docbiner/sdk",
+  "version": "0.1.0",
+  "description": "Official Node.js SDK for Docbiner HTML-to-PDF/Images API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "keywords": ["pdf", "html-to-pdf", "screenshot", "docbiner"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "typescript": "^5.9.3"
+  }
+}

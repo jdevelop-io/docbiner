@@ -1,0 +1,54 @@
+# Binaries
+/bin/
+/api
+/worker
+services/api/api
+services/worker/worker
+cmd/cli/docbiner
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+*.out
+coverage.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+.env.prod
+
+# Docker
+docker-compose.override.yml
+
+# Node (dashboard)
+node_modules/
+.next/
+out/
+
+# Minio data
+minio_data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Tmp
+tmp/

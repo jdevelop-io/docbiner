@@ -1,0 +1,34 @@
+groups:
+  - name: docbiner
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate (> 5%)"
+
+      - alert: HighQueueDepth
+        expr: nats_jetstream_consumer_num_pending > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NATS queue depth > 100"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage > 80%"
+
+      - alert: SlowConversions
+        expr: histogram_quantile(0.95, rate(conversion_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile conversion time > 30s"

@@ -1,0 +1,20 @@
+go 1.25.4
+
+use (
+	./cmd/cli
+	./internal/apikey
+	./internal/auth
+	./internal/billing
+	./internal/config
+	./internal/database
+	./internal/delivery
+	./internal/domain
+	./internal/pdfutil
+	./internal/queue
+	./internal/renderer
+	./internal/storage
+	./internal/tmpl
+	./internal/usage
+	./services/api
+	./services/worker
+)

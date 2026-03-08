@@ -1,0 +1,204 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:-docbiner.com}
+    depends_on:
+      api:
+        condition: service_healthy
+      dashboard:
+        condition: service_started
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - .env.prod
+    environment:
+      PORT: "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    env_file:
+      - .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "worker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      replicas: 4
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1"
+
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    expose:
+      - "3000"
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
+  nats:
+    image: nats:2-alpine
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - docbiner
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  redis_data:
+  nats_data:
+  minio_data:
+
+networks:
+  docbiner:
+    driver: bridge

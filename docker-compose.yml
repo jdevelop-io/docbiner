@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docbiner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docbiner_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-docbiner}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docbiner} -d ${POSTGRES_DB:-docbiner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2-alpine
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docbiner}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docbiner_dev_secret}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://docbiner:docbiner_dev@postgres:5432/docbiner?sslmode=disable}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docbiner}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docbiner_dev_secret}
+      MINIO_BUCKET: ${MINIO_BUCKET:-docbiner-files}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://docbiner:docbiner_dev@postgres:5432/docbiner?sslmode=disable}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docbiner}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docbiner_dev_secret}
+      MINIO_BUCKET: ${MINIO_BUCKET:-docbiner-files}
+      CHROMIUM_PATH: ${CHROMIUM_PATH:-/usr/bin/chromium-browser}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+
+volumes:
+  pg_data:
+  nats_data:
+  minio_data:

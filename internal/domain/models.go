@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -147,7 +148,7 @@ type Template struct {
 	Engine      TemplateEngine `json:"engine" db:"engine"`
 	HTMLContent string         `json:"html_content" db:"html_content"`
 	CSSContent  *string        `json:"css_content,omitempty" db:"css_content"`
-	SampleData  []byte         `json:"sample_data,omitempty" db:"sample_data"`
+	SampleData  json.RawMessage `json:"sample_data,omitempty" db:"sample_data"`
 	CreatedAt   time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at" db:"updated_at"`
 }

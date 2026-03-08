@@ -60,11 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem(TOKEN_KEY);
     if (stored) {
-      fetchProfile(stored);
+      void fetchProfile(stored);
     } else {
       setState((prev) => ({ ...prev, isLoading: false }));
     }
-  }, [fetchProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = useCallback(
     async (token: string) => {

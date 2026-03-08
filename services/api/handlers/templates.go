@@ -67,6 +67,14 @@ type UpdateTemplateRequest struct {
 	SampleData  map[string]interface{} `json:"sample_data"`
 }
 
+// PreviewInlineRequest is the JSON body for POST /v1/templates/preview (no saved template).
+type PreviewInlineRequest struct {
+	Engine     string                 `json:"engine"`
+	HTMLContent string               `json:"html_content"`
+	CSSContent  string               `json:"css_content"`
+	Data        map[string]interface{} `json:"data"`
+}
+
 // PreviewTemplateRequest is the JSON body for POST /v1/templates/:id/preview.
 type PreviewTemplateRequest struct {
 	Data map[string]interface{} `json:"data"`
@@ -304,11 +312,13 @@ func (h *TemplateHandler) Preview(c echo.Context) error {
 
 	// Parse request body for data.
 	var req PreviewTemplateRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "bad_request",
-			Message: "Invalid request body",
-		})
+	if c.Request().ContentLength > 0 {
+		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "bad_request",
+				Message: "Invalid request body",
+			})
+		}
 	}
 
 	// Use provided data, or fall back to sample_data.
@@ -325,6 +335,41 @@ func (h *TemplateHandler) Preview(c echo.Context) error {
 
 	// Render template.
 	rendered, err := h.renderer.Render(string(tpl.Engine), htmlContent, data)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "render_error",
+			Message: "Failed to render template",
+		})
+	}
+
+	return c.JSON(http.StatusOK, PreviewTemplateResponse{
+		HTML: rendered,
+	})
+}
+
+// PreviewInline handles POST /v1/templates/preview — renders without a saved template.
+func (h *TemplateHandler) PreviewInline(c echo.Context) error {
+	var req PreviewInlineRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.Engine == "" || req.HTMLContent == "" {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "validation_error",
+			Message: "engine and html_content are required",
+		})
+	}
+
+	htmlContent := req.HTMLContent
+	if req.CSSContent != "" {
+		htmlContent = "<style>" + req.CSSContent + "</style>" + htmlContent
+	}
+
+	rendered, err := h.renderer.Render(req.Engine, htmlContent, req.Data)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "render_error",

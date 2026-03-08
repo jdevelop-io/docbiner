@@ -12,19 +12,6 @@ interface PdfViewerProps {
   error: string | null;
 }
 
-function getMimeType(format: OutputFormat): string {
-  switch (format) {
-    case 'pdf':
-      return 'application/pdf';
-    case 'png':
-      return 'image/png';
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'webp':
-      return 'image/webp';
-  }
-}
-
 function getFileExtension(format: OutputFormat): string {
   return format === 'jpeg' ? 'jpg' : format;
 }

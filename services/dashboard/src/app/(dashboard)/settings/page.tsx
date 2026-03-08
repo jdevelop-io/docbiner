@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Users, Loader2, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -20,24 +20,11 @@ function SaveFeedback({ show }: { show: boolean }) {
 export default function SettingsPage() {
   const { user, organization } = useAuth();
 
-  const [displayName, setDisplayName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [orgName, setOrgName] = useState('');
+  const [displayName, setDisplayName] = useState(user?.display_name || '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+  const [orgName, setOrgName] = useState(organization?.name || '');
   const [profileSaved, setProfileSaved] = useState(false);
   const [orgSaved, setOrgSaved] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      setDisplayName(user.display_name || '');
-      setAvatarUrl(user.avatar_url || '');
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (organization) {
-      setOrgName(organization.name || '');
-    }
-  }, [organization]);
 
   const profileMutation = useMutation({
     mutationFn: (data: { display_name: string; avatar_url: string }) =>

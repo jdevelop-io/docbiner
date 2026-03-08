@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, Eye, Loader2 } from 'lucide-react';
@@ -29,41 +29,59 @@ const DEFAULT_SAMPLE_DATA = JSON.stringify(
 
 export default function TemplateEditorPage() {
   const params = useParams();
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const templateId = params.id as string;
   const isNew = templateId === 'new';
 
-  const [name, setName] = useState('');
-  const [engine, setEngine] = useState<'handlebars' | 'liquid'>('handlebars');
-  const [htmlContent, setHtmlContent] = useState(DEFAULT_HTML);
-  const [cssContent, setCssContent] = useState('');
-  const [sampleData, setSampleData] = useState(DEFAULT_SAMPLE_DATA);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   // Fetch existing template
-  const { data: template, isLoading: isLoadingTemplate } = useQuery({
+  const { data: template, isLoading: isLoadingTemplate, dataUpdatedAt } = useQuery({
     queryKey: ['template', templateId],
     queryFn: () => api.get<Template>(`/v1/templates/${templateId}`),
     enabled: !isNew,
   });
 
-  // Populate form with fetched template data
-  useEffect(() => {
-    if (template) {
-      setName(template.name);
-      setEngine(template.engine);
-      setHtmlContent(template.html_content);
-      setCssContent(template.css_content || '');
-      setSampleData(
-        template.sample_data
-          ? JSON.stringify(template.sample_data, null, 2)
-          : DEFAULT_SAMPLE_DATA,
-      );
-    }
-  }, [template]);
+  if (!isNew && isLoadingTemplate) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // key forces remount when template data loads, so initial state is correct
+  return (
+    <TemplateForm
+      key={dataUpdatedAt}
+      templateId={templateId}
+      isNew={isNew}
+      template={template ?? null}
+    />
+  );
+}
+
+function TemplateForm({
+  templateId,
+  isNew,
+  template,
+}: {
+  templateId: string;
+  isNew: boolean;
+  template: Template | null;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [name, setName] = useState(template?.name ?? '');
+  const [engine, setEngine] = useState<'handlebars' | 'liquid'>(template?.engine ?? 'handlebars');
+  const [htmlContent, setHtmlContent] = useState(template?.html_content ?? DEFAULT_HTML);
+  const [cssContent, setCssContent] = useState(template?.css_content ?? '');
+  const [sampleData, setSampleData] = useState(
+    template?.sample_data
+      ? JSON.stringify(template.sample_data, null, 2)
+      : DEFAULT_SAMPLE_DATA,
+  );
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -147,14 +165,6 @@ export default function TemplateEditorPage() {
   const handlePreview = useCallback(() => {
     previewMutation.mutate();
   }, [previewMutation]);
-
-  if (!isNew && isLoadingTemplate) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-[calc(100vh-theme(spacing.14)-theme(spacing.12))] flex-col lg:h-[calc(100vh-theme(spacing.12))]">
